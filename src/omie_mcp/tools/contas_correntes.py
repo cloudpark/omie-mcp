@@ -3,8 +3,13 @@
 from typing import Annotated, Optional
 from mcp.server.fastmcp import FastMCP, Context
 
+from ..client import exigir_identificador
+from ..policy import WritePolicy
 
-def register(mcp: FastMCP) -> None:
+
+def register(mcp: FastMCP, policy: WritePolicy) -> None:
+    # Módulo somente leitura — a API do OMIE não expõe escrita aqui,
+    # então `policy` não é consultado.
 
     @mcp.tool()
     async def listar_tipos_conta_corrente(ctx: Context) -> dict:
@@ -50,13 +55,19 @@ def register(mcp: FastMCP) -> None:
         codigo_conta_corrente: Annotated[Optional[int], "Código OMIE da conta corrente"] = None,
         codigo_integracao: Annotated[Optional[str], "Código de integração da conta corrente"] = None,
     ) -> dict:
-        """Consulta detalhes de uma conta corrente específica."""
+        """
+        Consulta detalhes de uma conta corrente específica.
+        Informe ao menos um dos identificadores.
+        """
         client = ctx.request_context.lifespan_context["omie"]
         params: dict = {}
-        if codigo_conta_corrente:
+        if codigo_conta_corrente is not None:
             params["nCodCC"] = codigo_conta_corrente
-        if codigo_integracao:
+        if codigo_integracao is not None:
             params["cCodIntCC"] = codigo_integracao
+        exigir_identificador(
+            params, "codigo_conta_corrente ou codigo_integracao"
+        )
         return await client.call("geral/contacorrente/", "ConsultarContaCorrente", params)
 
     @mcp.tool()
@@ -75,7 +86,7 @@ def register(mcp: FastMCP) -> None:
         Use listar_contas_correntes para descobrir o código (nCodCC).
         """
         client = ctx.request_context.lifespan_context["omie"]
-        if not codigo_conta_corrente and not codigo_integracao_conta:
+        if codigo_conta_corrente is None and codigo_integracao_conta is None:
             raise ValueError(
                 "Informe codigo_conta_corrente ou codigo_integracao_conta. "
                 "Use listar_contas_correntes para obter o código."
@@ -85,8 +96,8 @@ def register(mcp: FastMCP) -> None:
             "dPeriodoFinal": data_fim,
             "cExibirApenasSaldo": exibir_apenas_saldo,
         }
-        if codigo_conta_corrente:
+        if codigo_conta_corrente is not None:
             params["nCodCC"] = codigo_conta_corrente
-        if codigo_integracao_conta:
+        if codigo_integracao_conta is not None:
             params["cCodIntCC"] = codigo_integracao_conta
         return await client.call("financas/extrato/", "ListarExtrato", params)

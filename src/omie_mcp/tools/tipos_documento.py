@@ -5,6 +5,8 @@ import unicodedata
 from typing import Annotated, Optional
 from mcp.server.fastmcp import FastMCP, Context
 
+from ..policy import WritePolicy
+
 # PesquisarTipoDocumento não é paginado e a base padrão do OMIE tem ~290 tipos.
 # Sem limite, uma listagem sem filtro devolveria a tabela inteira.
 LIMITE_PADRAO = 50
@@ -22,7 +24,9 @@ def _normalizar(texto: str) -> str:
     return "".join(c for c in sem_acento if not unicodedata.combining(c)).casefold()
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: FastMCP, policy: WritePolicy) -> None:
+    # Módulo somente leitura — a API do OMIE não expõe escrita aqui,
+    # então `policy` não é consultado.
     cache: dict = {"tipos": [], "expira_em": 0.0}
 
     async def _obter_tipos(client) -> list[dict]:

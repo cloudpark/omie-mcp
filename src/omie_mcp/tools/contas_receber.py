@@ -4,8 +4,11 @@ from typing import Annotated, Optional
 from mcp.server.fastmcp import FastMCP, Context
 from pydantic import Field
 
+from ..client import exigir_identificador
+from ..policy import WritePolicy
 
-def register(mcp: FastMCP) -> None:
+
+def register(mcp: FastMCP, policy: WritePolicy) -> None:
 
     @mcp.tool()
     async def listar_contas_receber(
@@ -75,9 +78,9 @@ def register(mcp: FastMCP) -> None:
             params["filtrar_por_emissao_de"] = filtrar_por_emissao_de
         if filtrar_por_emissao_ate:
             params["filtrar_por_emissao_ate"] = filtrar_por_emissao_ate
-        if filtrar_cliente:
+        if filtrar_cliente is not None:
             params["filtrar_cliente"] = filtrar_cliente
-        if filtrar_conta_corrente:
+        if filtrar_conta_corrente is not None:
             params["filtrar_conta_corrente"] = filtrar_conta_corrente
         return await client.call(
             "financas/contareceber/", "ListarContasReceber", params, lista_vazia_ok=True
@@ -89,14 +92,23 @@ def register(mcp: FastMCP) -> None:
         codigo_lancamento_omie: Annotated[Optional[int], "Código do lançamento no OMIE"] = None,
         codigo_lancamento_integracao: Annotated[Optional[str], "Código de integração do lançamento"] = None,
     ) -> dict:
-        """Consulta detalhes de uma conta a receber específica."""
+        """
+        Consulta detalhes de uma conta a receber específica.
+        Informe ao menos um dos identificadores.
+        """
         client = ctx.request_context.lifespan_context["omie"]
         params: dict = {}
-        if codigo_lancamento_omie:
+        if codigo_lancamento_omie is not None:
             params["codigo_lancamento_omie"] = codigo_lancamento_omie
-        if codigo_lancamento_integracao:
+        if codigo_lancamento_integracao is not None:
             params["codigo_lancamento_integracao"] = codigo_lancamento_integracao
+        exigir_identificador(
+            params, "codigo_lancamento_omie ou codigo_lancamento_integracao"
+        )
         return await client.call("financas/contareceber/", "ConsultarContaReceber", params)
+
+    if not policy.escrita:
+        return
 
     @mcp.tool()
     async def incluir_conta_receber(
@@ -130,9 +142,9 @@ def register(mcp: FastMCP) -> None:
             params["numero_documento"] = numero_documento
         if data_emissao:
             params["data_emissao"] = data_emissao
-        if id_conta_corrente:
+        if id_conta_corrente is not None:
             params["id_conta_corrente"] = id_conta_corrente
-        if codigo_vendedor:
+        if codigo_vendedor is not None:
             params["codigo_vendedor"] = codigo_vendedor
         if observacao:
             params["observacao"] = observacao
@@ -156,8 +168,21 @@ def register(mcp: FastMCP) -> None:
         observacao: Annotated[Optional[str], "Observações sobre o recebimento"] = None,
         conciliar_documento: Annotated[str, "Conciliar automaticamente: S ou N"] = "N",
     ) -> dict:
-        """Registra o recebimento (baixa) de uma conta a receber."""
+        """
+        Registra o recebimento (baixa) de uma conta a receber.
+        Informe ao menos um identificador do título a baixar.
+        """
         client = ctx.request_context.lifespan_context["omie"]
+        # A baixa identifica o título por [codigo_lancamento], não por
+        # [codigo_lancamento_omie] (esse é o nome usado só nos métodos de chave).
+        titulo: dict = {}
+        if codigo_lancamento_omie is not None:
+            titulo["codigo_lancamento"] = codigo_lancamento_omie
+        if codigo_lancamento_integracao is not None:
+            titulo["codigo_lancamento_integracao"] = codigo_lancamento_integracao
+        exigir_identificador(
+            titulo, "codigo_lancamento_omie ou codigo_lancamento_integracao"
+        )
         params: dict = {
             "codigo_conta_corrente": codigo_conta_corrente,
             "valor": valor,
@@ -166,16 +191,14 @@ def register(mcp: FastMCP) -> None:
             "juros": juros,
             "multa": multa,
             "conciliar_documento": conciliar_documento,
+            **titulo,
         }
-        # A baixa identifica o título por [codigo_lancamento], não por
-        # [codigo_lancamento_omie] (esse é o nome usado só nos métodos de chave).
-        if codigo_lancamento_omie:
-            params["codigo_lancamento"] = codigo_lancamento_omie
-        if codigo_lancamento_integracao:
-            params["codigo_lancamento_integracao"] = codigo_lancamento_integracao
         if observacao:
             params["observacao"] = observacao
         return await client.call("financas/contareceber/", "LancarRecebimento", params)
+
+    if not policy.destrutiva:
+        return
 
     @mcp.tool()
     async def cancelar_recebimento(
@@ -186,13 +209,15 @@ def register(mcp: FastMCP) -> None:
         """
         Cancela/estorna o recebimento de uma conta a receber, revertendo a baixa.
         Identifica a baixa (retornada por lancar_recebimento), não o título.
+        Informe ao menos um dos identificadores.
         """
         client = ctx.request_context.lifespan_context["omie"]
         params: dict = {}
-        if codigo_baixa:
+        if codigo_baixa is not None:
             params["codigo_baixa"] = codigo_baixa
-        if codigo_baixa_integracao:
+        if codigo_baixa_integracao is not None:
             params["codigo_baixa_integracao"] = codigo_baixa_integracao
+        exigir_identificador(params, "codigo_baixa ou codigo_baixa_integracao")
         return await client.call("financas/contareceber/", "CancelarRecebimento", params)
 
     @mcp.tool()
@@ -201,13 +226,19 @@ def register(mcp: FastMCP) -> None:
         codigo_lancamento_omie: Annotated[Optional[int], "Código do lançamento no OMIE"] = None,
         codigo_lancamento_integracao: Annotated[Optional[str], "Código de integração do lançamento"] = None,
     ) -> dict:
-        """Exclui uma conta a receber do OMIE (apenas títulos em aberto)."""
+        """
+        Exclui uma conta a receber do OMIE (apenas títulos em aberto).
+        Informe ao menos um dos identificadores.
+        """
         client = ctx.request_context.lifespan_context["omie"]
         params: dict = {}
         # ExcluirContaReceber usa [chave_lancamento] — diferente de
         # ConsultarContaReceber, que usa [codigo_lancamento_omie].
-        if codigo_lancamento_omie:
+        if codigo_lancamento_omie is not None:
             params["chave_lancamento"] = codigo_lancamento_omie
-        if codigo_lancamento_integracao:
+        if codigo_lancamento_integracao is not None:
             params["codigo_lancamento_integracao"] = codigo_lancamento_integracao
+        exigir_identificador(
+            params, "codigo_lancamento_omie ou codigo_lancamento_integracao"
+        )
         return await client.call("financas/contareceber/", "ExcluirContaReceber", params)

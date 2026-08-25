@@ -3,8 +3,12 @@
 from typing import Annotated, Optional
 from mcp.server.fastmcp import FastMCP, Context
 
+from ..policy import WritePolicy
 
-def register(mcp: FastMCP) -> None:
+
+def register(mcp: FastMCP, policy: WritePolicy) -> None:
+    # Módulo somente leitura — a API do OMIE não expõe escrita aqui,
+    # então `policy` não é consultado.
 
     @mcp.tool()
     async def consultar_fluxo_caixa(
@@ -71,7 +75,7 @@ def register(mcp: FastMCP) -> None:
         }
         if data:
             params["dDia"] = data
-        if codigo_cliente:
+        if codigo_cliente is not None:
             params["nCodCliente"] = codigo_cliente
         if nome_cliente:
             params["cNomeCliente"] = nome_cliente
@@ -121,9 +125,9 @@ def register(mcp: FastMCP) -> None:
             params["dDtEmisDe"] = emissao_de
         if emissao_ate:
             params["dDtEmisAte"] = emissao_ate
-        if codigo_cliente:
+        if codigo_cliente is not None:
             params["nCodCliente"] = codigo_cliente
-        if codigo_conta_corrente:
+        if codigo_conta_corrente is not None:
             params["nCodCC"] = codigo_conta_corrente
         if status:
             params["cStatus"] = status

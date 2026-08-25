@@ -11,6 +11,28 @@ OMIE_BASE_URL = "https://app.omie.com.br/api/v1"
 FAULTCODE_SEM_REGISTROS = "5113"
 
 
+def exigir_identificador(params: dict[str, Any], nomes: str) -> dict[str, Any]:
+    """
+    Garante que ao menos um identificador foi informado.
+
+    Os métodos de chave do OMIE (consulta, exclusão, cancelamento) aceitam
+    identificadores alternativos, todos opcionais na assinatura da tool. Sem esta
+    checagem, uma chamada sem argumento nenhum enviaria `param: [{}]` e deixaria
+    a critério do ERP o que fazer com isso — inaceitável num método que exclui
+    título ou estorna baixa.
+
+    Args:
+        params: Parâmetros já montados (vazio = nenhum identificador informado).
+        nomes:  Nomes dos argumentos da tool, para a mensagem de erro.
+
+    Raises:
+        ValueError: quando nenhum identificador foi informado.
+    """
+    if not params:
+        raise ValueError(f"Informe ao menos um identificador: {nomes}.")
+    return params
+
+
 class OmieError(Exception):
     """Erro retornado pela API do OMIE (faultstring/faultcode)."""
 

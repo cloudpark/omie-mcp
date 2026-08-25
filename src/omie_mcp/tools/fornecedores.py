@@ -3,8 +3,11 @@
 from typing import Annotated, Optional
 from mcp.server.fastmcp import FastMCP, Context
 
+from ..client import exigir_identificador
+from ..policy import WritePolicy
 
-def register(mcp: FastMCP) -> None:
+
+def register(mcp: FastMCP, policy: WritePolicy) -> None:
 
     @mcp.tool()
     async def listar_fornecedores(
@@ -44,13 +47,19 @@ def register(mcp: FastMCP) -> None:
         """Consulta detalhes de um fornecedor específico. Informe ao menos um dos identificadores."""
         client = ctx.request_context.lifespan_context["omie"]
         params: dict = {}
-        if codigo_cliente_omie:
+        if codigo_cliente_omie is not None:
             params["codigo_cliente_omie"] = codigo_cliente_omie
-        if codigo_cliente_integracao:
+        if codigo_cliente_integracao is not None:
             params["codigo_cliente_integracao"] = codigo_cliente_integracao
         if cnpj_cpf:
             params["cnpj_cpf"] = cnpj_cpf
+        exigir_identificador(
+            params, "codigo_cliente_omie, codigo_cliente_integracao ou cnpj_cpf"
+        )
         return await client.call("geral/clientes/", "ConsultarCliente", params)
+
+    if not policy.escrita:
+        return
 
     @mcp.tool()
     async def incluir_fornecedor(
@@ -118,13 +127,19 @@ def register(mcp: FastMCP) -> None:
         estado: Annotated[Optional[str], "UF (ex: SP)"] = None,
         cep: Annotated[Optional[str], "CEP"] = None,
     ) -> dict:
-        """Altera dados de um fornecedor existente no OMIE."""
+        """
+        Altera dados de um fornecedor existente no OMIE.
+        Informe ao menos um identificador do fornecedor a alterar.
+        """
         client = ctx.request_context.lifespan_context["omie"]
         params: dict = {}
-        if codigo_cliente_omie:
+        if codigo_cliente_omie is not None:
             params["codigo_cliente_omie"] = codigo_cliente_omie
-        if codigo_cliente_integracao:
+        if codigo_cliente_integracao is not None:
             params["codigo_cliente_integracao"] = codigo_cliente_integracao
+        exigir_identificador(
+            params, "codigo_cliente_omie ou codigo_cliente_integracao"
+        )
         for field, value in [
             ("razao_social", razao_social), ("email", email),
             ("telefone1_ddd", telefone1_ddd), ("telefone1_numero", telefone1_numero),

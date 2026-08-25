@@ -3,6 +3,8 @@
 from typing import Annotated, Optional
 from mcp.server.fastmcp import FastMCP, Context
 
+from ..policy import WritePolicy
+
 # O OMIE trunca silenciosamente registros_por_pagina em 100 neste endpoint.
 MAX_REGISTROS_POR_PAGINA = 100
 
@@ -14,7 +16,9 @@ TIPOS_CONTA = {
 }
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: FastMCP, policy: WritePolicy) -> None:
+    # Módulo somente leitura — a API do OMIE não expõe escrita aqui,
+    # então `policy` não é consultado.
 
     @mcp.tool()
     async def listar_bancos(

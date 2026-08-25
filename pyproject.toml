@@ -13,17 +13,22 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Office/Business :: Financial",
 ]
+# Limites superiores em todas as dependências: um servidor MCP instalado via
+# `uvx --from git+...` resolve as dependências na hora e NÃO aplica o uv.lock,
+# então sem teto uma major nova entra sozinha na próxima execução.
+# Para travar as versões exatas do uv.lock, rode a partir de um clone local
+# com `uv run --locked omie-mcp`.
 dependencies = [
-    "httpx>=0.28.1",
+    "httpx>=0.28.1,<0.29",
     "mcp[cli]>=1.26.0,<2",
-    "pydantic>=2.0",
-    "python-dotenv>=1.2.2",
+    "pydantic>=2.0,<3",
+    "python-dotenv>=1.2.2,<2",
 ]
 
 [project.urls]
-Homepage = "https://github.com/lucassampsouza/omie-mcp"
-Repository = "https://github.com/lucassampsouza/omie-mcp"
-"Bug Tracker" = "https://github.com/lucassampsouza/omie-mcp/issues"
+Homepage = "https://github.com/cloudpark/omie-mcp"
+Repository = "https://github.com/cloudpark/omie-mcp"
+"Bug Tracker" = "https://github.com/cloudpark/omie-mcp/issues"
 
 [project.scripts]
 omie-mcp = "omie_mcp.server:main"
@@ -38,4 +43,9 @@ packages = ["src/omie_mcp"]
 [dependency-groups]
 dev = [
     "hatchling>=1.29.0",
+    "pytest>=8.0",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

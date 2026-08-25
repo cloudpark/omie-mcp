@@ -3,8 +3,11 @@
 from typing import Annotated, Optional
 from mcp.server.fastmcp import FastMCP, Context
 
+from ..client import exigir_identificador
+from ..policy import WritePolicy
 
-def register(mcp: FastMCP) -> None:
+
+def register(mcp: FastMCP, policy: WritePolicy) -> None:
 
     @mcp.tool()
     async def listar_lancamentos_bancarios(
@@ -25,7 +28,7 @@ def register(mcp: FastMCP) -> None:
             "nRegPorPagina": registros_por_pagina,
             "cOrdemDecrescente": ordem_descrescente,
         }
-        if codigo_conta_corrente:
+        if codigo_conta_corrente is not None:
             params["nCodCC"] = codigo_conta_corrente
         if data_lancamento_de:
             params["dtPagInicial"] = data_lancamento_de
@@ -45,14 +48,23 @@ def register(mcp: FastMCP) -> None:
         codigo_lancamento: Annotated[Optional[int], "Código do lançamento no OMIE"] = None,
         codigo_lancamento_integracao: Annotated[Optional[str], "Código de integração do lançamento"] = None,
     ) -> dict:
-        """Consulta detalhes de um lançamento bancário específico."""
+        """
+        Consulta detalhes de um lançamento bancário específico.
+        Informe ao menos um dos identificadores.
+        """
         client = ctx.request_context.lifespan_context["omie"]
         params: dict = {}
-        if codigo_lancamento:
+        if codigo_lancamento is not None:
             params["nCodLanc"] = codigo_lancamento
-        if codigo_lancamento_integracao:
+        if codigo_lancamento_integracao is not None:
             params["cCodIntLanc"] = codigo_lancamento_integracao
+        exigir_identificador(
+            params, "codigo_lancamento ou codigo_lancamento_integracao"
+        )
         return await client.call("financas/contacorrentelancamentos/", "ConsultaLancCC", params)
+
+    if not policy.escrita:
+        return
 
     @mcp.tool()
     async def incluir_lancamento_bancario(
@@ -86,15 +98,18 @@ def register(mcp: FastMCP) -> None:
         }
         if numero_documento:
             params["detalhes"]["cNumDoc"] = numero_documento
-        if codigo_cliente:
+        if codigo_cliente is not None:
             params["detalhes"]["nCodCliente"] = codigo_cliente
         if observacao:
             params["detalhes"]["cObs"] = observacao
-        if codigo_conta_destino:
+        if codigo_conta_destino is not None:
             params["transferencia"] = {"nCodCCDestino": codigo_conta_destino}
         if codigo_integracao:
             params["cCodIntLanc"] = codigo_integracao
         return await client.call("financas/contacorrentelancamentos/", "IncluirLancCC", params)
+
+    if not policy.destrutiva:
+        return
 
     @mcp.tool()
     async def excluir_lancamento_bancario(
@@ -102,11 +117,17 @@ def register(mcp: FastMCP) -> None:
         codigo_lancamento: Annotated[Optional[int], "Código do lançamento no OMIE"] = None,
         codigo_lancamento_integracao: Annotated[Optional[str], "Código de integração do lançamento"] = None,
     ) -> dict:
-        """Exclui um lançamento bancário em conta corrente."""
+        """
+        Exclui um lançamento bancário em conta corrente.
+        Informe ao menos um dos identificadores.
+        """
         client = ctx.request_context.lifespan_context["omie"]
         params: dict = {}
-        if codigo_lancamento:
+        if codigo_lancamento is not None:
             params["nCodLanc"] = codigo_lancamento
-        if codigo_lancamento_integracao:
+        if codigo_lancamento_integracao is not None:
             params["cCodIntLanc"] = codigo_lancamento_integracao
+        exigir_identificador(
+            params, "codigo_lancamento ou codigo_lancamento_integracao"
+        )
         return await client.call("financas/contacorrentelancamentos/", "ExcluirLancCC", params)

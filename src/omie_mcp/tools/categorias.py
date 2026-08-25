@@ -3,6 +3,8 @@
 from typing import Annotated, Optional
 from mcp.server.fastmcp import FastMCP, Context
 
+from ..policy import WritePolicy
+
 # O OMIE trunca silenciosamente registros_por_pagina em 100 neste endpoint:
 # pedir 500 devolve 100 sem avisar.
 MAX_REGISTROS_POR_PAGINA = 100
@@ -15,7 +17,7 @@ TAMANHO_CODIGO_GRUPO = 4
 MAX_PAGINAS_VARREDURA = 50
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: FastMCP, policy: WritePolicy) -> None:
 
     @mcp.tool()
     async def listar_categorias(
@@ -131,6 +133,9 @@ def register(mcp: FastMCP) -> None:
             {"nPagina": pagina, "nRegPorPagina": registros_por_pagina},
             lista_vazia_ok=True,
         )
+
+    if not policy.escrita:
+        return
 
     @mcp.tool()
     async def incluir_categoria(

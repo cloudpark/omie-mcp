@@ -3,12 +3,16 @@
 from typing import Annotated
 from mcp.server.fastmcp import FastMCP, Context
 
+from ..policy import WritePolicy
+
 # O OMIE só aceita vincular uma categoria a contas do DRE analíticas: nível 3,
 # exibíveis e não totalizadoras.
 NIVEL_DRE_ANALITICO = 3
 
 
-def register(mcp: FastMCP) -> None:
+def register(mcp: FastMCP, policy: WritePolicy) -> None:
+    # Módulo somente leitura — a API do OMIE não expõe escrita aqui,
+    # então `policy` não é consultado.
 
     @mcp.tool()
     async def listar_contas_dre(
